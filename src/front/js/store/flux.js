@@ -1,101 +1,74 @@
 const getState = ({ getStore, getActions, setStore }) => {
 	return {
 		store: {
-			message: null,
-			auth: false,
-			demo: [
-				{
-					title: "FIRST",
-					background: "white",
-					initial: "white"
-				},
-				{
-					title: "SECOND",
-					background: "white",
-					initial: "white"
-				}
-			]
+			token: sessionStorage.getItem("token") || null,
+			user: null
 		},
 		actions: {
-			// Use getActions to call a function within a fuction
 			login: async (email, password) => {
-
-
-				const myHeaders = new Headers();
-				myHeaders.append("Content-Type", "application/json");
-
-				const raw = JSON.stringify({
-					"email": email,
-					"password": password
-				});
-
-				const requestOptions = {
-					method: "POST",
-					headers: myHeaders,
-					body: raw,
-					redirect: "follow"
-				};
-
 				try {
-					const response = await fetch("https://potential-spork-7pvx7qxxxj9c64x-3001.app.github.dev/api/login", requestOptions);
-					const result = await response.json();
-
-					if (response.status === 200) {
-						localStorage.setItem("token", result.access_token)
-						return true
-					}
-				} catch (error) {
-					console.error(error);
-					return false;
-				};
-			},
-			getProfile: async () => {
-				let token = localStorage.getItem("token")
-				try {
-					const response = await fetch("https://potential-spork-7pvx7qxxxj9c64x-3001.app.github.dev/api/profile", {
-						method: "GET",
+					const resp = await fetch(process.env.BACKEND_URL + "/api/login", {
+						method: "POST",
 						headers: {
-							"Authorization": `Bearer ${token}`
+							"Content-Type": "application/json"
 						},
+						body: JSON.stringify({ email, password })
 					});
-					const result = await response.json();
-					console.log(result)
+
+					if (!resp.ok) {
+						alert("Credenciais inválidas");
+						return false;
+					}
+
+					const data = await resp.json();
+					sessionStorage.setItem("token", data.access_token);
+					setStore({ token: data.access_token, user: data.user });
+
+					return true;
 				} catch (error) {
-					console.error(error);
-				};
-			},
-			tokenVerify:()=>{
-				//crear un nuevo endpoint que se llame verificacion de token
-				//la peticion en la funcion tokenVerify del front deberia actualizar un estado auth:
-			},
-			logout:()=>{
-				//borrar el token del localStorage
-			},
-			getMessage: async () => {
-				try {
-					// fetching data from the backend
-					const resp = await fetch(process.env.BACKEND_URL + "/api/hello")
-					const data = await resp.json()
-					setStore({ message: data.message })
-					// don't forget to return something, that is how the async resolves
-					return data;
-				} catch (error) {
-					console.log("Error loading message from backend", error)
+					console.error("Erro no login:", error);
+					return false;
 				}
 			},
-			changeColor: (index, color) => {
-				//get the store
+
+			getProfile: async () => {
 				const store = getStore();
 
-				//we have to loop the entire demo array to look for the respective index
-				//and change its color
-				const demo = store.demo.map((elm, i) => {
-					if (i === index) elm.background = color;
-					return elm;
-				});
+				try {
+					const resp = await fetch(process.env.BACKEND_URL + "/api/profile", {
+						method: "GET",
+						headers: {
+							Authorization: "Bearer " + store.token
+						}
+					});
 
-				//reset the global store
-				setStore({ demo: demo });
+					if (!resp.ok) {
+						console.warn("Token inválido ou expirado");
+						return;
+					}
+
+					const data = await resp.json();
+					setStore({ user: data.user });
+				} catch (error) {
+					console.error("Erro ao obter perfil:", error);
+				}
+			},
+
+			logout: () => {
+				sessionStorage.removeItem("token");
+				setStore({ token: null, user: null });
+			},
+
+			getMessage: async () => {
+				// Exemplo de fetch (mantido do boilerplate original)
+				try {
+					const resp = await fetch(process.env.BACKEND_URL + "/api/hello");
+					const data = await resp.json();
+					console.log(data.message);
+					return data.message;
+				} catch (error) {
+					console.error("Erro ao obter mensagem do backend:", error);
+				}
 			}
 		}
 	};
